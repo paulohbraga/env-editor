@@ -13,6 +13,24 @@
   "main": "./out/extension.js",
   "icon": "resources/icon.png",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "envEditorContainer",
+          "title": "Env Vars Editor",
+          "icon": "resources/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "envEditorContainer": [
+        {
+          "type": "webview",
+          "id": "envEditor.sidebar",
+          "name": "Env Vars Editor"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "envEditor.open",

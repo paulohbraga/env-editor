@@ -8,31 +8,21 @@ type MessageFromWebview =
   | { type: "delete"; key: string; source: string }
   | { type: "add"; key: string; value: string; source: string };
 
-export function createPanel(context: vscode.ExtensionContext): void {
-  const panel = vscode.window.createWebviewPanel(
-    "envEditor",
-    "Env Vars Editor",
-    vscode.ViewColumn.One,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-    }
-  );
-
-  panel.webview.html = getHtml(panel.webview, context);
+export function setupWebview(webview: vscode.Webview, context: vscode.ExtensionContext): void {
+  webview.html = getHtml(webview, context);
 
   function sendVars() {
     try {
       const vars = readAllVars();
       const sources = getAvailableSources();
-      panel.webview.postMessage({ type: "vars", vars, sources });
+      webview.postMessage({ type: "vars", vars, sources });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      panel.webview.postMessage({ type: "error", message: msg });
+      webview.postMessage({ type: "error", message: msg });
     }
   }
 
-  panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
+  webview.onDidReceiveMessage((msg: MessageFromWebview) => {
     switch (msg.type) {
       case "ready":
       case "refresh":
@@ -47,10 +37,10 @@ export function createPanel(context: vscode.ExtensionContext): void {
           }
           writeVar({ key: msg.key, value: msg.value, source: msg.source });
           sendVars();
-          panel.webview.postMessage({ type: "toast", message: `Saved ${msg.key}` });
+          webview.postMessage({ type: "toast", message: `Saved ${msg.key}` });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          panel.webview.postMessage({ type: "error", message });
+          webview.postMessage({ type: "error", message });
         }
         break;
       }
@@ -59,10 +49,10 @@ export function createPanel(context: vscode.ExtensionContext): void {
         try {
           writeVar({ key: msg.key, value: msg.value, source: msg.source });
           sendVars();
-          panel.webview.postMessage({ type: "toast", message: `Added ${msg.key}` });
+          webview.postMessage({ type: "toast", message: `Added ${msg.key}` });
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
-          panel.webview.postMessage({ type: "error", message });
+          webview.postMessage({ type: "error", message });
         }
         break;
       }
@@ -79,10 +69,10 @@ export function createPanel(context: vscode.ExtensionContext): void {
               try {
                 deleteVar({ key: msg.key, source: msg.source });
                 sendVars();
-                panel.webview.postMessage({ type: "toast", message: `Deleted ${msg.key}` });
+                webview.postMessage({ type: "toast", message: `Deleted ${msg.key}` });
               } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : String(err);
-                panel.webview.postMessage({ type: "error", message });
+                webview.postMessage({ type: "error", message });
               }
             }
           });
@@ -90,6 +80,19 @@ export function createPanel(context: vscode.ExtensionContext): void {
       }
     }
   });
+}
+
+export function createPanel(context: vscode.ExtensionContext): void {
+  const panel = vscode.window.createWebviewPanel(
+    "envEditor",
+    "Env Vars Editor",
+    vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+    }
+  );
+  setupWebview(panel.webview, context);
 }
 
 function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): string {
@@ -214,6 +217,8 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
     td { padding: 6px 10px; vertical-align: middle; word-break: break-all; }
     td.key-col { font-weight: 600; font-family: var(--vscode-editor-font-family); font-size: 0.9em; min-width: 120px; }
     td.val-col { color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); font-size: 0.9em; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .masked-val { letter-spacing: 0.15em; opacity: 0.5; vertical-align: middle; }
+    .reveal-btn { font-size: 0.85em; vertical-align: middle; margin-left: 4px; opacity: 0.6; }
     td.src-col { font-size: 0.8em; opacity: 0.7; white-space: nowrap; }
     td.act-col { white-space: nowrap; text-align: right; }
 
@@ -400,9 +405,16 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
         if (isEditing) {
           return buildEditRow(v);
         }
+        const sensitive = isSensitive(v.key);
+        const valCell = sensitive
+          ? \`<td class="val-col" title="Value hidden — click 👁 to reveal" data-value="\${escHtml(v.value)}">
+              <span class="masked-val">••••••••</span>
+              <button class="icon-btn reveal-btn" title="Reveal value" onclick="toggleReveal(this)">👁</button>
+            </td>\`
+          : \`<td class="val-col" title="\${escHtml(v.value)}">\${escHtml(v.value)}</td>\`;
         return \`<tr>
           <td class="key-col">\${escHtml(v.key)}</td>
-          <td class="val-col" title="\${escHtml(v.value)}">\${escHtml(v.value)}</td>
+          \${valCell}
           <td class="src-col"><span class="source-label">\${escHtml(v.source)}</span></td>
           <td class="act-col">
             <button class="icon-btn" title="Edit" onclick="startEdit(\${JSON.stringify(v.key)},\${JSON.stringify(v.source)})">✏️</button>
@@ -490,6 +502,20 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
     // ── Util ─────────────────────────────────────────────────────
     function escHtml(str) {
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function isSensitive(key) {
+      return /secret|password|key/i.test(key);
+    }
+
+    function toggleReveal(btn) {
+      const td = btn.parentElement;
+      const span = td.querySelector('.masked-val');
+      const isHidden = span.textContent.includes('•');
+      span.textContent = isHidden ? td.dataset.value : '••••••••';
+      btn.title = isHidden ? 'Hide value' : 'Reveal value';
+      btn.textContent = isHidden ? '🙈' : '👁';
+      td.title = isHidden ? td.dataset.value : 'Value hidden — click 👁 to reveal';
     }
   </script>
 </body>
