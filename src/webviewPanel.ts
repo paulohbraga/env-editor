@@ -8,6 +8,7 @@ type MessageFromWebview =
   | { type: "delete"; key: string; source: string }
   | { type: "add"; key: string; value: string; source: string };
 
+let currentPanel: vscode.WebviewPanel | undefined;
 export function setupWebview(webview: vscode.Webview, context: vscode.ExtensionContext): void {
   webview.html = getHtml(webview, context);
 
@@ -83,7 +84,12 @@ export function setupWebview(webview: vscode.Webview, context: vscode.ExtensionC
 }
 
 export function createPanel(context: vscode.ExtensionContext): void {
-  const panel = vscode.window.createWebviewPanel(
+  if (currentPanel) {
+    currentPanel.reveal(vscode.ViewColumn.One, true);
+    return;
+  }
+
+  currentPanel = vscode.window.createWebviewPanel(
     "envEditor",
     "Env Vars Editor",
     vscode.ViewColumn.One,
@@ -92,7 +98,12 @@ export function createPanel(context: vscode.ExtensionContext): void {
       retainContextWhenHidden: true,
     }
   );
-  setupWebview(panel.webview, context);
+
+  currentPanel.onDidDispose(() => {
+    currentPanel = undefined;
+  });
+
+  setupWebview(currentPanel.webview, context);
 }
 
 function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): string {
