@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { readAllVars, writeVar, deleteVar, getAvailableSources, EnvVar } from "./envProvider";
+import { readAllVars, writeVar, deleteVar, getAvailableSources } from "./envProvider";
 
 type MessageFromWebview =
   | { type: "ready" }
@@ -298,7 +298,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
 
   <div class="toolbar">
     <input type="text" id="search" placeholder="Filter by name or value…" />
-    <button class="secondary" onclick="refresh()">↺ Refresh</button>
+    <button class="secondary" data-action="refresh">↺ Refresh</button>
   </div>
 
   <div class="source-tabs" id="source-tabs"></div>
@@ -329,7 +329,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
     </div>
     <div class="row2">
       <span style="font-size:0.8em;opacity:0.6;">Leave value empty to add an empty variable.</span>
-      <button class="primary" onclick="addVar()">Add Variable</button>
+      <button class="primary" data-action="add">Add Variable</button>
     </div>
   </div>
 
@@ -362,6 +362,34 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
 
     // ── Search ───────────────────────────────────────────────────
     document.getElementById('search').addEventListener('input', renderTable);
+    document.addEventListener('click', onClick);
+
+    function onClick(event) {
+      const target = event.target;
+      const button = target && target.closest ? target.closest('button[data-action]') : null;
+      if (!button) {
+        return;
+      }
+
+      const action = button.dataset.action;
+      if (action === 'refresh') {
+        refresh();
+      } else if (action === 'add') {
+        addVar();
+      } else if (action === 'set-source') {
+        setSource(button.dataset.source || 'ALL');
+      } else if (action === 'edit') {
+        startEdit(button.dataset.key || '', button.dataset.source || '');
+      } else if (action === 'delete') {
+        deleteVar(button.dataset.key || '', button.dataset.source || '');
+      } else if (action === 'save-edit') {
+        saveEdit(button.dataset.originalKey || '', button.dataset.originalSource || '');
+      } else if (action === 'cancel-edit') {
+        cancelEdit();
+      } else if (action === 'reveal') {
+        toggleReveal(button);
+      }
+    }
 
     // ── Source tabs ──────────────────────────────────────────────
     function renderSourceTabs() {
@@ -369,7 +397,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
       const tabs = ['ALL', ...sources];
       container.innerHTML = tabs.map(s =>
         '<button class="source-tab' + (s === activeSource ? ' active' : '') +
-        '" onclick="setSource(' + JSON.stringify(s) + ')">' + s + '</button>'
+        '" data-action="set-source" data-source="' + escHtml(s) + '">' + escHtml(s) + '</button>'
       ).join('');
     }
 
@@ -409,7 +437,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
         const valCell = sensitive
           ? \`<td class="val-col" title="Value hidden — click 👁 to reveal" data-value="\${escHtml(v.value)}">
               <span class="masked-val">••••••••</span>
-              <button class="icon-btn reveal-btn" title="Reveal value" onclick="toggleReveal(this)">👁</button>
+              <button class="icon-btn reveal-btn" title="Reveal value" data-action="reveal">👁</button>
             </td>\`
           : \`<td class="val-col" title="\${escHtml(v.value)}">\${escHtml(v.value)}</td>\`;
         return \`<tr>
@@ -417,8 +445,8 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
           \${valCell}
           <td class="src-col"><span class="source-label">\${escHtml(v.source)}</span></td>
           <td class="act-col">
-            <button class="icon-btn" title="Edit" onclick="startEdit(\${JSON.stringify(v.key)},\${JSON.stringify(v.source)})">✏️</button>
-            <button class="icon-btn" title="Delete" onclick="deleteVar(\${JSON.stringify(v.key)},\${JSON.stringify(v.source)})">🗑</button>
+            <button class="icon-btn" title="Edit" data-action="edit" data-key="\${escHtml(v.key)}" data-source="\${escHtml(v.source)}">✏️</button>
+            <button class="icon-btn" title="Delete" data-action="delete" data-key="\${escHtml(v.key)}" data-source="\${escHtml(v.source)}">🗑</button>
           </td>
         </tr>\`;
       }).join('');
@@ -434,8 +462,8 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
         <td><select id="edit-src">\${sourceOptions}</select></td>
         <td>
           <div class="edit-actions">
-            <button class="primary" onclick="saveEdit(\${JSON.stringify(v.key)},\${JSON.stringify(v.source)})">Save</button>
-            <button class="secondary" onclick="cancelEdit()">Cancel</button>
+            <button class="primary" data-action="save-edit" data-original-key="\${escHtml(v.key)}" data-original-source="\${escHtml(v.source)}">Save</button>
+            <button class="secondary" data-action="cancel-edit">Cancel</button>
           </div>
         </td>
       </tr>\`;
