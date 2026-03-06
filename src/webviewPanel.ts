@@ -91,7 +91,7 @@ export function createPanel(context: vscode.ExtensionContext): void {
 
   currentPanel = vscode.window.createWebviewPanel(
     "envEditor",
-    ".env Editor",
+    "✏️.env Editor",
     vscode.ViewColumn.One,
     {
       enableScripts: true,
