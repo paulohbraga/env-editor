@@ -1,9 +1,14 @@
 {
   "name": "env-editor",
-  "displayName": "Env Vars Editor",
+  "displayName": ".env Editor",
   "description": "View and edit environment variables on macOS (.bashrc / .zshrc) and Windows (System & User vars)",
   "version": "0.1.0",
   "publisher": "env-editor",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -17,7 +22,7 @@
       "activitybar": [
         {
           "id": "envEditorContainer",
-          "title": "Env Vars Editor",
+          "title": ".env Editor",
           "icon": "resources/sidebar-icon.svg"
         }
       ]
@@ -27,7 +32,7 @@
         {
           "type": "webview",
           "id": "envEditor.sidebar",
-          "name": "Env Vars Editor"
+          "name": ".env Editor"
         }
       ]
     },

@@ -1,4 +1,4 @@
-# Env Vars Editor — VS Code Extension
+# .env Editor — VS Code Extension
 
 A VS Code extension to **view and edit environment variables** directly from the editor.
 

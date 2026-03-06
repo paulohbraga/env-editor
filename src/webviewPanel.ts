@@ -91,7 +91,7 @@ export function createPanel(context: vscode.ExtensionContext): void {
 
   currentPanel = vscode.window.createWebviewPanel(
     "envEditor",
-    "Env Vars Editor",
+    ".env Editor",
     vscode.ViewColumn.One,
     {
       enableScripts: true,
@@ -115,7 +115,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Env Vars Editor</title>
+  <title>.env Editor</title>
   <style nonce="${nonce}">
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -305,7 +305,7 @@ function getHtml(webview: vscode.Webview, _context: vscode.ExtensionContext): st
   </style>
 </head>
 <body>
-  <h1>🌐 Env Vars Editor <span class="badge" id="count-badge">…</span></h1>
+  <h1>✏️ .env Editor <span class="badge" id="count-badge">…</span></h1>
 
   <div class="toolbar">
     <input type="text" id="search" placeholder="Filter by name or value…" />
