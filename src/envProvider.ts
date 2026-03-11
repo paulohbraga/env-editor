@@ -65,28 +65,62 @@ function deleteFromShellFile(filePath: string, key: string): void {
 
 type WinScope = "HKCU\\Environment" | "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
 
+/**
+ * Escape value for use in Windows reg.exe command.
+ * reg.exe is sensitive to special characters and quotes.
+ */
+function escapeRegValue(value: string): string {
+  // Escape backslashes first
+  let escaped = value.replace(/\\/g, "\\\\");
+  // Escape double quotes
+  escaped = escaped.replace(/"/g, '\\"');
+  return escaped;
+}
+
 function winReadScope(regKey: WinScope, sourceName: string): EnvVar[] {
   try {
-    const output = execSync(`reg query "${regKey}"`, { encoding: "utf8" });
+    const output = execSync(`reg query "${regKey}"`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
     const vars: EnvVar[] = [];
     for (const line of output.split("\n")) {
+      // Skip header and empty lines
+      if (!line.trim() || line.includes("HKEY")) continue;
+      
       const match = line.match(/^\s+(\S+)\s+(REG_\w+)\s+(.*)$/);
       if (match) {
-        vars.push({ key: match[1], value: match[3].trim(), source: sourceName });
+        const key = match[1];
+        const type = match[2];
+        const value = match[3].trim();
+        // Skip default entries
+        if (key !== "(Default)") {
+          vars.push({ key, value, source: sourceName });
+        }
       }
     }
     return vars;
-  } catch {
+  } catch (err) {
+    // Registry key might not exist, return empty array
     return [];
   }
 }
 
 function winWriteVar(regKey: WinScope, key: string, value: string): void {
-  execSync(`reg add "${regKey}" /v "${key}" /t REG_SZ /d "${value}" /f`, { encoding: "utf8" });
+  // Escape special characters in the value for reg.exe
+  const escapedValue = escapeRegValue(value);
+  const cmd = `reg add "${regKey}" /v "${key}" /t REG_SZ /d "${escapedValue}" /f`;
+  try {
+    execSync(cmd, { encoding: "utf8" });
+  } catch (err) {
+    throw new Error(`Failed to save "${key}" to ${regKey}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 function winDeleteVar(regKey: WinScope, key: string): void {
-  execSync(`reg delete "${regKey}" /v "${key}" /f`, { encoding: "utf8" });
+  const cmd = `reg delete "${regKey}" /v "${key}" /f`;
+  try {
+    execSync(cmd, { encoding: "utf8" });
+  } catch (err) {
+    throw new Error(`Failed to delete "${key}" from ${regKey}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 // ─────────────────────────────────────────────

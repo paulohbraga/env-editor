@@ -1,9 +1,9 @@
 {
-  "name": "env-editor",
-  "displayName": ".env Editor",
+  "name": "dot-env-edit-for-vscode-mac-windows-linux-all-platforms",
+  "displayName": "Env Vars Editor - System Environment Variables Manager",
   "description": "View and edit environment variables on macOS (.bashrc / .zshrc) and Windows (System & User vars)",
-  "version": "0.1.0",
-  "publisher": "env-editor",
+  "version": "0.2.0",
+  "publisher": "PauloHenriqueBraga",
   "repository": {
     "type": "git",
     "url": ""

@@ -32,6 +32,16 @@ export function setupWebview(webview: vscode.Webview, context: vscode.ExtensionC
 
       case "save": {
         try {
+          // Check if trying to write to System registry without admin on Windows
+          if (process.platform === "win32" && msg.source === "Windows System") {
+            vscode.window.showInformationMessage(
+              "Editing System variables requires VS Code to run as Administrator. " +
+              "Please restart VS Code with admin privileges or edit User variables instead.",
+              "OK"
+            );
+            return;
+          }
+          
           // If key or source changed, delete old entry first
           if (msg.originalKey !== msg.key || msg.originalSource !== msg.source) {
             deleteVar({ key: msg.originalKey, source: msg.originalSource });
