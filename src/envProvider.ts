@@ -79,26 +79,39 @@ function escapeRegValue(value: string): string {
 
 function winReadScope(regKey: WinScope, sourceName: string): EnvVar[] {
   try {
-    const output = execSync(`reg query "${regKey}"`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    // Use PowerShell with an encoded command to avoid cmd.exe escaping issues
+    // and to guarantee correct UTF-8 output (reg.exe can output UTF-16 LE which
+    // breaks when decoded as UTF-8 in execSync).
+    const psDrive = regKey.startsWith("HKCU\\")
+      ? regKey.replace("HKCU\\", "HKCU:\\")
+      : regKey.replace("HKLM\\", "HKLM:\\");
+
+    const script =
+      `$k=Get-Item '${psDrive}';` +
+      `$k.GetValueNames()|ForEach-Object{` +
+      `$n=$_;` +
+      `$v=$k.GetValue($n,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames);` +
+      `$n+'=SEP='+$v}`;
+
+    const encoded = Buffer.from(script, "utf16le").toString("base64");
+    const output = execSync(
+      `powershell -NoProfile -NonInteractive -EncodedCommand ${encoded}`,
+      { encoding: "utf8", windowsHide: true }
+    );
+
     const vars: EnvVar[] = [];
-    for (const line of output.split("\n")) {
-      // Skip header and empty lines
-      if (!line.trim() || line.includes("HKEY")) continue;
-      
-      const match = line.match(/^\s+(\S+)\s+(REG_\w+)\s+(.*)$/);
-      if (match) {
-        const key = match[1];
-        const type = match[2];
-        const value = match[3].trim();
-        // Skip default entries
-        if (key !== "(Default)") {
-          vars.push({ key, value, source: sourceName });
-        }
+    for (const line of output.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) { continue; }
+      const idx = trimmed.indexOf("=SEP=");
+      if (idx > 0) {
+        const key = trimmed.substring(0, idx);
+        const value = trimmed.substring(idx + 5);
+        vars.push({ key, value, source: sourceName });
       }
     }
     return vars;
   } catch (err) {
-    // Registry key might not exist, return empty array
     return [];
   }
 }
